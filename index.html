@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <script type='text/javascript' src='https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js'></script>
+  <link rel='stylesheet' href='https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css'>
+  <style>
+    html, body { width:100%; height:100%; margin:0; padding:0; }
+    #map { width:100%; height:100vh; margin:0; padding:0; background:#1a1a2e; }
+    #status { position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.7); 
+              color:#00aaff; padding:6px 12px; border-radius:4px; font-family:sans-serif; 
+              font-size:12px; z-index:999; }
+  </style>
+</head>
+<body>
+  <div id='map'></div>
+  <div id='status'>Waiting for data...</div>
+
+  <script>
+    var map, datasource, popup;
+
+    map = new atlas.Map('map', {
+      center: [-61.5, 10.5],
+      zoom: 10,
+      style: 'satellite_road_labels',
+      authOptions: {
+        authType: 'subscriptionKey',
+        subscriptionKey: 'FEnq3lmLq7DJI44CnMPBvSQu7cJP1332MorwLDMKgH6YUWpodu67JQQJ99CBACYeBjFxYSSkAAAgAZMP3tWQ'
+      }
+    });
+
+    map.events.add('ready', function() {
+
+      datasource = new atlas.source.DataSource();
+      map.sources.add(datasource);
+
+      var bubbleLayer = new atlas.layer.BubbleLayer(datasource, 'bubble-layer', {
+        radius: 10,
+        color: ['match', ['get', 'status'],
+          'Active', '#00ff00',
+          'Standby', '#ffff00',
+          'Deployed', '#ff6600',
+          '#00aaff'
+        ],
+        strokeColor: '#ffffff',
+        strokeWidth: 2
+      });
+
+      var labelLayer = new atlas.layer.SymbolLayer(datasource, 'label-layer', {
+        iconOptions: { image: 'none' },
+        textOptions: {
+          textField: ['get', 'label'],
+          offset: [0, 1.8],
+          color: '#ffffff',
+          size: 11,
+          haloColor: '#000000',
+          haloWidth: 1
+        }
+      });
+
+      map.layers.add([bubbleLayer, labelLayer]);
+
+      popup = new atlas.Popup({ pixelOffset: [0, -15] });
+
+      map.events.add('click', 'bubble-layer', function(e) {
+        if (e.shapes && e.shapes.length > 0) {
+          var props = e.shapes[0].getProperties();
+          popup.setOptions({
+            position: e.shapes[0].getCoordinates(),
+            content:
+              '<div style="background:#1a1a2e;color:#fff;padding:12px;border-radius:8px;' +
+              'font-family:sans-serif;min-width:200px;border:1px solid #00aaff">' +
+              '<div style="color:#00aaff;font-weight:bold;font-size:14px;margin-bottom:8px">ASSET DETAILS</div>' +
+              '<b>Asset:</b> ' + props.assetUsed + '<br>' +
+              '<b>Base:</b> ' + props.baseName + '<br>' +
+              '<b>Ops Type:</b> ' + props.opsType + '<br>' +
+              '<b>Category:</b> ' + props.opsCategory + '<br>' +
+              '<b>Status:</b> <span style="color:' + (props.status === 'Active' ? '#00ff00' : '#ffff00') + '">' + props.status + '</span>' +
+              '</div>'
+          });
+          popup.open(map);
+        }
+      });
+
+      map.controls.add([
+        new atlas.control.ZoomControl(),
+        new atlas.control.CompassControl(),
+        new atlas.control.StyleControl(),
+        new atlas.control.FullscreenControl()
+      ], { position: 'top-right' });
+
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'assetData') {
+          updateMarkers(event.data.assets);
+        }
+      });
+
+      document.getElementById('status').innerText = 'Map ready - awaiting asset data';
+    });
+
+    function updateMarkers(assetData) {
+      datasource.clear();
+      popup.close();
+      var count = 0;
+      assetData.forEach(function(a) {
+        var lat = parseFloat(a.Latitude);
+        var lng = parseFloat(a.Longitude);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          datasource.add(new atlas.data.Feature(
+            new atlas.data.Point([lng, lat]), {
+              label: a['Asset Used'],
+              assetUsed: a['Asset Used'] || 'Unknown',
+              baseName: a['Base Name'] || 'Unknown',
+              opsType: a['Operations Type'] || 'Unknown',
+              opsCategory: a['Operations Category'] || 'Unknown',
+              status: a['Status'] || 'Unknown'
+            }
+          ));
+          count++;
+        }
+      });
+      var now = new Date().toLocaleTimeString();
+      document.getElementById('status').innerText = 
+        'Assets tracked: ' + count + ' | Last update: ' + now;
+    }
+  </script>
+</body>
+</html>

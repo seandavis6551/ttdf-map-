@@ -1,23 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset='utf-8'>
-  <meta name='viewport' content='width=device-width, initial-scale=1'>
-  <script type='text/javascript' src='https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js'></script>
-  <link rel='stylesheet' href='https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css'>
-  <style>
-    html, body { width:100%; height:100%; margin:0; padding:0; }
-    #map { width:100%; height:100vh; margin:0; padding:0; background:#1a1a2e; }
-    #status { position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.7); 
-              color:#00aaff; padding:6px 12px; border-radius:4px; font-family:sans-serif; 
-              font-size:12px; z-index:999; }
-  </style>
-</head>
-<body>
-  <div id='map'></div>
-  <div id='status'>Waiting for data...</div>
-
-  <script>
+<script>
     var map, datasource, popup;
 
     map = new atlas.Map('map', {
@@ -75,8 +56,7 @@
               '<b>Asset:</b> ' + props.assetUsed + '<br>' +
               '<b>Base:</b> ' + props.baseName + '<br>' +
               '<b>Ops Type:</b> ' + props.opsType + '<br>' +
-              '<b>Category:</b> ' + props.opsCategory + '<br>' +
-              '<b>Status:</b> <span style="color:' + (props.status === 'Active' ? '#00ff00' : '#ffff00') + '">' + props.status + '</span>' +
+              '<b>Category:</b> ' + props.opsCategory +
               '</div>'
           });
           popup.open(map);
@@ -91,42 +71,38 @@
       ], { position: 'top-right' });
 
       document.getElementById('status').innerText = 'Loading asset data...';
-fetchAssets();
-setInterval(fetchAssets, 30000);
-});
+      fetchAssets();
+      setInterval(fetchAssets, 30000);
+    });
 
-async function fetchAssets() {
-  try {
-    var siteId = 'solaristt.sharepoint.com';
-    var listName = 'Joint Operations Activity Log';
-    var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + ':/sites/root:/lists/' + encodeURIComponent(listName) + '/items?expand=fields&$top=100';
-    
-    var response = await fetch(url, {
-      headers: {
-        'Authorization': 'Bearer ' + await getToken()
+    async function fetchAssets() {
+      try {
+        var tokenResponse = await fetch('/.auth/me');
+        var tokenData = await tokenResponse.json();
+        var token = tokenData[0].access_token;
+
+        var graphUrl = "https://graph.microsoft.com/v1.0/sites/solaris6551.sharepoint.com:/sites/SolarisSecurityOperationsHub:/lists/Joint%20Operations%20Activity%20Log/items?expand=fields&$top=100";
+
+        var response = await fetch(graphUrl, {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        var data = await response.json();
+        var assets = data.value.map(function(item) {
+          return item.fields;
+        });
+        updateMarkers(assets);
+
+      } catch(err) {
+        document.getElementById('status').innerText = 'Error: ' + err.message;
       }
-    });
-    
-    var data = await response.json();
-    var assets = data.value.map(function(item) {
-      return item.fields;
-    });
-    updateMarkers(assets);
-  } catch(err) {
-    document.getElementById('status').innerText = 'Error loading data: ' + err.message;
-  }
-}
-
-async function getToken() {
-  var response = await fetch('/.auth/me');
-  var data = await response.json();
-  return data[0].access_token;
-}
-    });
+    }
 
     function updateMarkers(assetData) {
       datasource.clear();
-      popup.close();
+      if (popup) popup.close();
       var count = 0;
       assetData.forEach(function(a) {
         var lat = parseFloat(a.Latitude);
@@ -134,21 +110,18 @@ async function getToken() {
         if (!isNaN(lat) && !isNaN(lng)) {
           datasource.add(new atlas.data.Feature(
             new atlas.data.Point([lng, lat]), {
-              label: a['Asset Used'],
-              assetUsed: a['Asset Used'] || 'Unknown',
-              baseName: a['Base Name'] || 'Unknown',
-              opsType: a['Operations Type'] || 'Unknown',
-              opsCategory: a['Operations Category'] || 'Unknown',
-              status: a['Status'] || 'Unknown'
+              label: a.Asset_x0020_Used || a['Asset Used'] || 'Asset',
+              assetUsed: a.Asset_x0020_Used || a['Asset Used'] || 'Unknown',
+              baseName: a.Base_x0020_Name || a['Base Name'] || 'Unknown',
+              opsType: a.Operations_x0020_Type || a['Operations Type'] || 'Unknown',
+              opsCategory: a.Operations_x0020_Category || a['Operations Category'] || 'Unknown'
             }
           ));
           count++;
         }
       });
       var now = new Date().toLocaleTimeString();
-      document.getElementById('status').innerText = 
+      document.getElementById('status').innerText =
         'Assets tracked: ' + count + ' | Last update: ' + now;
     }
   </script>
-</body>
-</html>

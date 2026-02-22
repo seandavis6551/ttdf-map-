@@ -1,4 +1,21 @@
 {
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/277b4318-2d18-484f-bdd6-5970360167c6",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": [
+            "scope=openid profile email https://graph.microsoft.com/Sites.Read.All"
+          ]
+        }
+      }
+    }
+  },
   "routes": [
     {
       "route": "/*",

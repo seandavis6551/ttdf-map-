@@ -98,16 +98,15 @@
     });
 
     async function getToken() {
-      var r = await fetch('/.auth/me');
-      var d = await r.json();
-      var token = d[0]?.access_token;
-      if (!token) {
-        var tr = await fetch('/.auth/refresh');
-        var td = await tr.json();
-        token = td.access_token;
-      }
-      return token;
-    }
+  var r = await fetch('/.auth/me');
+  var d = await r.json();
+  if (d && d.clientPrincipal) {
+    var tr = await fetch('/.auth/token?provider=aad&scope=https://graph.microsoft.com/Sites.Read.All');
+    var td = await tr.json();
+    return td.access_token;
+  }
+  return null;
+}
 
     async function fetchData() {
       try {
